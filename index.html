@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mini Netflix</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #121212;
+      color: #fff;
+    }
+    header {
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #searchInput {
+      padding: 10px;
+      width: 60%;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      margin-top: 10px;
+    }
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      padding: 20px;
+    }
+    .movie-card {
+      background-color: #1e1e1e;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: transform 0.2s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .movie-card:hover {
+      transform: scale(1.05);
+    }
+    .movie-card img {
+      width: 100%;
+      display: block;
+    }
+    .card-footer {
+      padding: 10px;
+      text-align: center;
+    }
+    .card-footer button {
+      margin: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #333;
+      color: #fff;
+    }
+    .card-footer button:hover {
+      background-color: crimson;
+    }
+  </style>
+  </head>
+<body>
+  <header>
+    <h1>🎬 Mini Netflix</h1>
+    <input type="text" id="searchInput" placeholder="Search movies..." />
+    <p>
+      Join our <a href="https://t.me/+6YMikWo4851jYWM0" target="_blank">Telegram Channel</a><br />
+      Chat with <a href="https://t.me/Arenamoviesbot?start=ar1752186065" target="_blank">Arena Bot</a>
+    </p>
+    <p id="userInfo"></p>
+  </header>
+
+  <main>
+    <section id="movies" class="movie-grid"></section>
+  </main>
+
+
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    
+ 
+
+
+    const API_KEY = '3633b89cd5c59bab33c1e3a7f0615f42';
+    const TRENDING_URL = `https://api.themoviedb.org/3/trending/movie/week?api_key=${API_KEY}`;
+    const SEARCH_URL = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=`;
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+    const BOT_TOKEN = '7607501903:AAG079fg4K5jY3kw70ie2FDqIT0Kaxm7K-w';
+    const CHANNEL_LINK = 'https://t.me/+6YMikWo4851jYWM0';
+
+    let userId = null;
+    let searchHistory = [];
+
+    window.Telegram.WebApp.ready();
+    const tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+
+    if (tgUser) {
+      db.collection("users").doc(userId.toString()).set({
+  name: tgUser.first_name,
+  username: tgUser.username,
+  timestamp: firebase.firestore.FieldValue.serverTimestamp()
+});
+
+      userId = tgUser.id;
+      db.collection("users").doc(userId.toString()).set({
+  name: tgUser.first_name,
+  username: tgUser.username,
+  timestamp: firebase.firestore.FieldValue.serverTimestamp()
+});
+
+      document.getElementById('userInfo').innerText = `Welcome, ${tgUser.first_name} (@${tgUser.username})`;
+
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: userId,
+          text: `🎬 Hello ${tgUser.first_name}, welcome to Arena Movies!`
+        })
+      }).catch(err => console.warn("Telegram message failed:", err));
+    }
+
+    async function fetchMovies(url) {
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const selected = data.results.sort(() => 0.5 - Math.random()).slice(0, 20);
+        displayMovies(selected);
+      } catch (error) {
+        console.error("Failed to fetch movies:", error);
+        document.getElementById('movies').innerHTML = '<p>🚫 Failed to load movies.</p>';
+      }
+    }
+
+    async function getCharacters(movieId) {
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}`);
+        const data = await res.json();
+        return data.cast.slice(0, 3).map(actor => actor.name).join(', ');
+      } catch {
+        return 'N/A';
+      }
+    }
+
+    async function displayMovies(movies) {
+      const container = document.getElementById('movies');
+      container.innerHTML = '';
+
+      for (const movie of movies) {
+        const characters = await getCharacters(movie.id);
+        const releaseDate = new Date(movie.release_date);
+        const today = new Date();
+        const isUpcoming = releaseDate > today;
+
+        const card = document.createElement('div');
+        card.className = 'movie-card';
+        card.innerHTML = `
+          ${isUpcoming ? '<div class="coming-soon">Coming Soon</div>' : ''}
+          <div class="trending-badge">🔥 Trending</div>
+          <img src="${movie.poster_path ? IMG_BASE + movie.poster_path : 'https://via.placeholder.com/500x750?text=No+Image'}" alt="${movie.title}" />
+          <div class="movie-info">
+            <strong>${movie.title}</strong><br>
+            Release: ${movie.release_date}<br>
+            Characters: ${characters}<br>
+            Rating: ⭐ ${movie.vote_average}
+          </div>
+          <div class="card-footer">
+            <button onclick="likeMovie('${movie.id}')">❤️ Like</button>
+            <button onclick="commentMovie('${movie.title}')">💬 Comment</button>
+            <button onclick="fetchTrailer(${movie.id})">▶️ Trailer</button>
+            <button onclick="downloadMovie('${movie.title}')">📥 Download Here</button>
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function downloadMovie(title) {
+      const encodedTitle = encodeURIComponent(title);
+      window.open(`${CHANNEL_LINK}?start=${encodedTitle}`, '_blank');
+    }
+
+    let debounceTimeout;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(() => {
+        const query = e.target.value.trim();
+        if (query.length > 2) {
+          searchHistory.push(query);
+          if (userId) {
+            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: userId,
+                text: `🔎 You searched for: "${query}"`
+              })
+            });
+          }
+          fetchMovies(SEARCH_URL + encodeURIComponent(query));
+        } else {
+          fetchMovies(TRENDING_URL);
+        }
+      }, 500);
+    });
+
+    function likeMovie(id) {
+  alert(`❤️ Liked movie ID: ${id}`);
+  if (userId) {
+    db.collection("users")
+      .doc(userId.toString())
+      .collection("interactions")
+      .add({
+        movieId: id,
+        action: "liked",
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+
+  function commentMovie(title) {
+  const comment = prompt(`💬 Comment on "${title}":`);
+  if (comment && userId) {
+    const reply = confirm("Would you like to reply to an existing comment?");
+    let replyText = '';
+    if (reply) {
+      replyText = prompt("Enter your reply:");
+    }
+
+    const fullComment = reply
+      ? `${comment}\n↪️ Reply: ${replyText}`
+      : comment;
+
+    // Save to Firestore
+    db.collection("users")
+      .doc(userId.toString())
+      .collection("comments")
+      .add({
+        movieTitle: title,
+        comment: fullComment,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+    // Send to Telegram
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: `💬 Your comment on "${title}":\n${fullComment}`
+      })
+    }).catch(err => console.warn("Failed to send comment:", err));
+  }
+}
+
+
+    const fullComment = reply
+      ? `💬 New comment on "${title}": ${comment}\n↪️ Reply: ${replyText}`
+      : `💬 Your comment on "${title}": ${comment}`;
+
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: fullComment
+      })
+    }).catch(err => console.warn("Failed to send comment:", err));
+  }
+  }
+  async function fetchTrailer(id) {
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/videos?api_key=${API_KEY}`);
+    const data = await res.json();
+
+    // Filter for YouTube trailers
+    const trailer = data.results.find(video =>
+      video.type.toLowerCase() === 'trailer' &&
+      video.site.toLowerCase() === 'youtube'
+    );
+
+    if (trailer) {
+      const trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
+      window.open(trailerUrl, '_blank');
+    } else {
+      alert('🚫 Trailer not available.');
+    }
+  } catch (error) {
+    console.error("Failed to fetch trailer:", error);
+    alert('🚫 Error loading trailer.');
+  }
+}
+
+    // Initial load
+    fetchMovies(TRENDING_URL);
+
+    // Auto-refresh trending movies every 30 seconds
+    setInterval(() => {
+      const query = document.getElementById('searchInput').value.trim();
+      if (query.length <= 2) {
+        fetchMovies(TRENDING_URL);
+      }
+    }, 30000);
+  </script>
+</body>
+</html>
+
